@@ -1,0 +1,46 @@
+\documentclass[11pt,journal,onecolumn]{IEEEtran}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{booktabs}
+
+\begin{document}
+
+\title{ForecastIQ: A Modern Multi-Horizon Time-Series Forecasting and Benchmarking Platform}
+\author{Anuj Meena}
+\maketitle
+
+\begin{abstract}
+This report details the implementation of ForecastIQ, a SOTA sequence forecasting framework comparing Patch-based Time-Series Transformers (PatchTST), univariate residual decomposition networks (N-BEATS), and Temporal Fusion Transformers (TFT). Utilizing channel-independence, multi-frequency simulated demand datasets, and robust MinMax scaling pipelines, the platform evaluates multi-horizon predictions ($24$ steps out based on $96$ steps of history) using MAE, RMSE, and sMAPE. A FastAPI web prediction engine and Streamlit comparative dashboard with Plotly residual charts are developed.
+\end{abstract}
+
+\section{Introduction}
+Time-series forecasting is essential across demand planning, logistics, and resource allocation. While traditional methods (like LSTMs) struggle to preserve long-term temporal dependencies, modern transformer architectures address these limitations. ForecastIQ implements and benchmarks three SOTA architectures: PatchTST, N-BEATS, and a custom Gated Gated TFT.
+
+\section{Forecasting Architectures}
+\subsection{Model Specifications}
+\begin{itemize}
+    \item \textbf{PatchTST}: Implements channel-independence (flattening features to parallel subseries) and groups sequential steps into overlapping patches. This reduces transformer sequence complexity from quadratic to linear while preserving local patterns.
+    \item \textbf{N-BEATS}: A deep stack of fully-connected blocks utilizing forward and backward residual links to decompose sequence trends and seasonality components.
+    \item \textbf{Temporal Fusion Transformer (TFT)}: Integrates multi-horizon prediction, self-attention, static covariate encoders, and gated linear unit (GLU) nodes to filter out noise.
+\end{itemize}
+
+\section{Data and Processing Pipeline}
+The data pipeline implements a rolling-window formatter. Input arrays of shape $[\text{Batch}, \text{Seq\_Len}, \text{Features}]$ are normalized relative to running scale factors. The dataset split isolates the final $20\%$ segment for validation and backtest simulations, ensuring no data leakage during model training.
+
+\section{Metric Formulation}
+Three key metrics are calculated to evaluate accuracy:
+\begin{equation}
+\text{MAE} = \frac{1}{N}\sum |y_i - \hat{y}_i|
+\end{equation}
+\begin{equation}
+\text{RMSE} = \sqrt{\frac{1}{N}\sum (y_i - \hat{y}_i)^2}
+\end{equation}
+\begin{equation}
+\text{sMAPE} = \frac{100\%}{N} \sum \frac{|y_i - \hat{y}_i|}{(|y_i| + |\hat{y}_i|)/2}
+\end{equation}
+
+\section{Conclusion}
+ForecastIQ presents a standardized benchmarking environment for time-series forecasting. By deploying SOTA architectures (PatchTST, N-BEATS, and TFT) side-by-side with strict validation and REST API pipelines, the platform offers a production-ready solution for enterprise sequence prediction.
+
+\end{document}
