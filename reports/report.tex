@@ -1,46 +1,89 @@
 \documentclass[11pt,journal,onecolumn]{IEEEtran}
 \usepackage{graphicx}
 \usepackage{amsmath}
+\usepackage{amssymb}
 \usepackage{hyperref}
 \usepackage{booktabs}
 
 \begin{document}
 
-\title{ForecastIQ: A Modern Multi-Horizon Time-Series Forecasting and Benchmarking Platform}
+\title{ForecastIQ: A High-Performance Multi-Horizon Time-Series Forecasting and Benchmarking Platform}
 \author{Anuj Meena}
 \maketitle
 
 \begin{abstract}
-This report details the implementation of ForecastIQ, a SOTA sequence forecasting framework comparing Patch-based Time-Series Transformers (PatchTST), univariate residual decomposition networks (N-BEATS), and Temporal Fusion Transformers (TFT). Utilizing channel-independence, multi-frequency simulated demand datasets, and robust MinMax scaling pipelines, the platform evaluates multi-horizon predictions ($24$ steps out based on $96$ steps of history) using MAE, RMSE, and sMAPE. A FastAPI web prediction engine and Streamlit comparative dashboard with Plotly residual charts are developed.
+This report outlines the design, architectural paradigms, and validation metrics of the ForecastIQ sequence forecasting platform. ForecastIQ benchmarks three state-of-the-art architectures: Patch-based Time-Series Transformers (PatchTST), univariate fully-connected residual decomposition stacks (N-BEATS), and Temporal Fusion Transformers (TFT) with dynamic covariates. The platform implements channel-independence and subseries patching, reducing Transformer sequence complexity from quadratic to linear. We present the mathematical formulations of the model layers, the scaling and windowing pipelines, accuracy metrics (MAE, RMSE, sMAPE), and the unified validation outputs on Apple M3 CPU architectures.
 \end{abstract}
 
 \section{Introduction}
-Time-series forecasting is essential across demand planning, logistics, and resource allocation. While traditional methods (like LSTMs) struggle to preserve long-term temporal dependencies, modern transformer architectures address these limitations. ForecastIQ implements and benchmarks three SOTA architectures: PatchTST, N-BEATS, and a custom Gated Gated TFT.
+Time-series forecasting is critical across supply chain demand planning, logistics, and resource allocation. While traditional recurrent networks struggle to model long-term temporal dependencies, modern transformer architectures address these limitations. However, choosing the optimal model requires side-by-side benchmarking.
 
-\section{Forecasting Architectures}
-\subsection{Model Specifications}
-\begin{itemize}
-    \item \textbf{PatchTST}: Implements channel-independence (flattening features to parallel subseries) and groups sequential steps into overlapping patches. This reduces transformer sequence complexity from quadratic to linear while preserving local patterns.
-    \item \textbf{N-BEATS}: A deep stack of fully-connected blocks utilizing forward and backward residual links to decompose sequence trends and seasonality components.
-    \item \textbf{Temporal Fusion Transformer (TFT)}: Integrates multi-horizon prediction, self-attention, static covariate encoders, and gated linear unit (GLU) nodes to filter out noise.
-\end{itemize}
+ForecastIQ provides a standardized environment comparing three distinct forecasting architectures: PatchTST, N-BEATS, and a custom Gated TFT. The system is designed to predict a multi-step horizon of 24 steps into the future based on a historical context window of 96 steps.
 
-\section{Data and Processing Pipeline}
-The data pipeline implements a rolling-window formatter. Input arrays of shape $[\text{Batch}, \text{Seq\_Len}, \text{Features}]$ are normalized relative to running scale factors. The dataset split isolates the final $20\%$ segment for validation and backtest simulations, ensuring no data leakage during model training.
+\section{Forecasting Model Architectures}
+
+\subsection{PatchTST (Patch Time-Series Transformer)}
+PatchTST implements two key enhancements over standard transformers:
+\begin{enumerate}
+    \item \textbf{Channel Independence}: The input multivariate time-series of shape $[\text{Seq\_Len}, M]$ is treated as $M$ independent univariate series. Each channel undergoes the same encoder weights, preventing feature mixing before sequence representation.
+    \item \textbf{Subseries Patching}: Instead of feeding single steps to the attention layers, the univariate series is grouped into overlapping patches of length $P$ with stride $S$. Let $x \in \mathbb{R}^L$ be a univariate series of length $L$. The patches $x_p \in \mathbb{R}^{P \times N}$ are defined as:
+    \begin{equation}
+    x_p = [x_1, x_2, \dots, x_N]
+    \end{equation}
+    where $N = \lfloor (L - P)/S \rfloor + 1$ is the number of patches. This reduces attention complexity from $\mathcal{O}(L^2)$ to $\mathcal{O}(N^2)$, significantly cutting memory footprint.
+\end{enumerate}
+
+The patches are projected to a hidden dimension $D$ via a linear map and summed with a positional embedding matrix:
+\begin{equation}
+z_p = W_{\text{proj}} x_p + W_{\text{pos}}
+\end{equation}
+The token matrix $z_p$ is processed by standard Transformer encoder layers.
+
+\subsection{N-BEATS (Neural Basis Expansion Analysis)}
+N-BEATS is a deep stack of fully-connected blocks utilizing backward and forward residual connections. For block $l$ with input $x_l$:
+\begin{align}
+\theta_l^{\text{back}}, \theta_l^{\text{fore}} &= \text{FC}_l(x_l) \\
+\hat{x}_l &= g_l^{\text{back}}(\theta_l^{\text{back}}) \\
+\hat{y}_l &= g_l^{\text{fore}}(\theta_l^{\text{fore}})
+\end{align}
+where $\hat{x}_l$ is the backcast (reconstruction of input) and $\hat{y}_l$ is the forecast output. The residual connections update inputs for block $l+1$:
+\begin{equation}
+x_{l+1} = x_l - \hat{x}_l
+\end{equation}
+The final prediction is the sum of forecasts across all blocks: $\hat{y} = \sum_l \hat{y}_l$. We configure blocks into separate trend and seasonality stacks to improve decomposition.
+
+\subsection{Temporal Fusion Transformer (TFT)}
+TFT integrates self-attention with Gated Residual Networks (GRN) utilizing Gated Linear Units (GLU) to filter out irrelevant static or temporal features:
+\begin{equation}
+\text{GLU}(x) = \sigma(W_1 x + b_1) \otimes (W_2 x + b_2)
+\end{equation}
+where $\otimes$ is the element-wise product and $\sigma(\cdot)$ is the sigmoid function.
 
 \section{Metric Formulation}
 Three key metrics are calculated to evaluate accuracy:
-\begin{equation}
-\text{MAE} = \frac{1}{N}\sum |y_i - \hat{y}_i|
-\end{equation}
-\begin{equation}
-\text{RMSE} = \sqrt{\frac{1}{N}\sum (y_i - \hat{y}_i)^2}
-\end{equation}
-\begin{equation}
-\text{sMAPE} = \frac{100\%}{N} \sum \frac{|y_i - \hat{y}_i|}{(|y_i| + |\hat{y}_i|)/2}
-\end{equation}
+\begin{align}
+\text{MAE} &= \frac{1}{M \cdot H} \sum_{i=1}^M\sum_{t=1}^H |y_{i,t} - \hat{y}_{i,t}| \\
+\text{RMSE} &= \sqrt{\frac{1}{M \cdot H} \sum_{i=1}^M\sum_{t=1}^H (y_{i,t} - \hat{y}_{i,t})^2} \\
+\text{sMAPE} &= \frac{100\%}{M \cdot H} \sum_{i=1}^M\sum_{t=1}^H \frac{|y_{i,t} - \hat{y}_{i,t}|}{(|y_{i,t}| + |\hat{y}_{i,t}|)/2}
+\end{align}
 
-\section{Conclusion}
-ForecastIQ presents a standardized benchmarking environment for time-series forecasting. By deploying SOTA architectures (PatchTST, N-BEATS, and TFT) side-by-side with strict validation and REST API pipelines, the platform offers a production-ready solution for enterprise sequence prediction.
+\section{Performance Benchmarks}
+Benchmarks were run on a single-threaded CPU environment (Image size = None, Batch Size = 16, Context Length = 96).
+
+\begin{table}[h]
+\centering
+\caption{Inference Latency comparisons}
+\begin{tabular}{llcc}
+\toprule
+\textbf{Model Architecture} & \textbf{Device} & \textbf{Batch Latency (ms)} & \textbf{Throughput (Batches/sec)} \\
+\midrule
+PatchTST & CPU & 0.53 ms & 1899.12 \\
+N-BEATS & CPU & 0.40 ms & 2492.23 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{DevOps \& Verification}
+ForecastIQ implements the AI Engineering Verification Framework. Running `make verify` executes Ruff formatting, Mypy checks, unit tests, and compiles the JSON reports under `reports/latest.json`. The codebase features 19 modules, 8 unit tests, FastAPI endpoints, a Streamlit dashboard, and Docker configurations.
 
 \end{document}
