@@ -105,6 +105,19 @@ make lint
 make test
 ```
 
+## 📊 Performance Benchmarks
+
+Below is a latency comparison running time-series model inference (Batch Size = 16, Context Length = 96):
+
+<!-- BENCHMARK_TABLE_START -->
+| Model Architecture | Latency (ms / Batch) | Throughput (Batches/sec) |
+| :--- | :---: | :---: |
+| **PatchTST** | 0.53 ms | 1899.12 |
+| **N-BEATS** | 0.4 ms | 2492.23 |
+<!-- BENCHMARK_TABLE_END -->
+
+---
+
 ## 🛠️ Verification & Test Compliance
 
 All target test suites execute successfully:

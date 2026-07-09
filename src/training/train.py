@@ -12,7 +12,7 @@ from src.data.processor import PyTorchForecastDataset
 from src.models.patchtst import PatchTST
 from src.models.nbeats import NBeats
 from src.models.tft import TemporalFusionTransformer
-from src.utils.logging import setup_logger
+from src.utils.logger import setup_logger
 
 logger = setup_logger("train", "train.log")
 

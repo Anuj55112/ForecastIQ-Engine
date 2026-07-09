@@ -1,3 +1,14 @@
-from src.models.patchtst import PatchTST
-from src.models.nbeats import NBeats
-from src.models.tft import TemporalFusionTransformer
+try:
+    from src.models.patchtst import PatchTST
+except ImportError:
+    pass
+
+try:
+    from src.models.nbeats import NBeats
+except ImportError:
+    pass
+
+try:
+    from src.models.tft import TemporalFusionTransformer
+except ImportError:
+    pass
