@@ -59,6 +59,70 @@ TFT integrates self-attention with Gated Residual Networks (GRN) utilizing Gated
 \end{equation}
 where $\otimes$ is the element-wise product and $\sigma(\cdot)$ is the sigmoid function.
 
+\section{System Architecture \& Class Diagrams}
+The internal codebase uses modular object wrappers, separating model declarations from evaluation pipelines.
+
+\subsection{Data Sequence Flows}
+The time-series forecasting data pipeline follows a structured sequence:
+\begin{enumerate}
+    \item **Data Ingestion**: Ingests historical multi-frequency data via CSV format.
+    \item **Pre-processing Block**: Computes min-max scaling to project inputs to $[0, 1]$.
+    \item **Sliding Window Generator**: Splits the normalized series into sliding context blocks ($L = 96$ steps) and horizon target blocks ($H = 24$ steps).
+    \item **Model Forecast**: Feeds the context blocks into the active forecasting models.
+    \item **Scale Inversion**: Inverts predictions to calculate actual scaling bounds.
+    \item **Validation Engine**: Computes error metrics and outputs visual forecasting results.
+\end{enumerate}
+
+\subsection{TimeSeriesProcessor Class Map}
+The processor module handles indexing and normalization transforms:
+\begin{verbatim}
++--------------------------------------------------------------+
+|                     TimeSeriesProcessor                      |
+|  - data: DataFrame                                           |
+|  - scaler: MinMaxScaler                                      |
++--------------------------------------------------------------+
+|  + __init__(file_path: str)                                  |
+|  + load_and_scale() -> ndarray                               |
+|  + create_windows(context_len: int, horizon_len: int)        |
+|  + inverse_scale(predictions: Tensor) -> Tensor              |
++--------------------------------------------------------------+
+                               |
+                               v
++--------------------------------------------------------------+
+|                       EvaluationEngine                       |
++--------------------------------------------------------------+
+|  + calculate_metrics(y_true, y_pred) -> dict                 |
+|  + plot_forecasts(y_true, y_pred, model_name: str)           |
++--------------------------------------------------------------+
+\end{verbatim}
+
+\section{Model Hyperparameters \& Tensor Dimensions}
+To guarantee full reproducibility, the model dimensions are specified as follows:
+\begin{itemize}
+    \item \textbf{Sliding Window Bounds}:
+    \begin{itemize}
+        \item Context Window Length ($L$): 96 steps.
+        \item Forecast Horizon ($H$): 24 steps.
+    \end{itemize}
+    \item \textbf{PatchTST Network Dims}:
+    \begin{itemize}
+        \item Input Tensor Shape: $[B, 96, 1]$ where $B$ is the batch size (default = 16).
+        \item Patch Length ($P$): 16 steps.
+        \item Stride ($S$): 8 steps.
+        \item Resulting Token Count ($N$): 11 patches.
+        \item Feature Embeddings Channel ($D$): 128 channels.
+        \item Attention Encoder Heads: 4.
+    \end{itemize}
+    \item \textbf{N-BEATS Stack Dims}:
+    \begin{itemize}
+        \item Input Tensor Shape: $[B, 96]$
+        \item Trend Blocks: 3, seasonality blocks: 3.
+        \item Inner Linear Layer Dimension: 512.
+        \item Target Forecast Shape: $[B, 24]$
+    \end{itemize}
+    \item \textbf{Optimizer Config}: Adam optimizer with learning rate $\eta = 5e-4$, decay $= 1e-6$, trained over 10 epochs.
+\end{itemize}
+
 \section{Metric Formulation}
 Three key metrics are calculated to evaluate accuracy:
 \begin{align}
