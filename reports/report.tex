@@ -131,6 +131,20 @@ Three key metrics are calculated to evaluate accuracy:
 \text{sMAPE} &= \frac{100\%}{M \cdot H} \sum_{i=1}^M\sum_{t=1}^H \frac{|y_{i,t} - \hat{y}_{i,t}|}{(|y_{i,t}| + |\hat{y}_{i,t}|)/2}
 \end{align}
 
+
+\section{Anomaly Detection \& Alerting Math}
+ForecastIQ integrates a statistical anomaly detection layer that monitors forecasting residuals to flag structural pattern shifts. For each timestep $t$, the prediction error is compared against the distribution of historical validation errors:
+\begin{equation}
+\text{Anomaly}(t) = \mathbb{I}\left(|y_t - \hat{y}_t| > \mu_{\text{err}} + z \cdot \sigma_{\text{err}}\right)
+\end{equation}
+where:
+\begin{itemize}
+    \item $\mathbb{I}(\cdot)$ is the binary indicator function.
+    \item $\mu_{\text{err}}$ and $\sigma_{\text{err}}$ are the running mean and standard deviation of validation residuals.
+    \item $z$ is the anomaly sensitivity multiplier (default $= 2.5$).
+\end{itemize}
+When a residual exceeds this threshold, the system triggers a real-time visual alert on the Streamlit dashboard, flagging potential pipeline disruptions or market shocks.
+
 \section{Performance Benchmarks}
 Benchmarks were run on a single-threaded CPU environment (Image size = None, Batch Size = 16, Context Length = 96).
 
